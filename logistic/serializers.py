@@ -14,7 +14,7 @@ class ProductPositionSerializer(serializers.ModelSerializer):
     # настройте сериализатор для позиции продукта на складе
     class Meta:
         model = StockProduct
-        fields = ['id', 'stock', 'product', 'quantity', 'price']
+        fields = ['id', 'product', 'quantity', 'price']
 
 
 class StockSerializer(serializers.ModelSerializer):
@@ -23,7 +23,7 @@ class StockSerializer(serializers.ModelSerializer):
     # настройте сериализатор для склада
     class Meta:
         model = Stock
-        fields = ['id', 'address', 'products']
+        fields = ['id', 'address', 'products', 'positions']
 
     def create(self, validated_data):
         # достаем связанные данные для других таблиц
@@ -35,7 +35,6 @@ class StockSerializer(serializers.ModelSerializer):
         # здесь вам надо заполнить связанные таблицы
         # в нашем случае: таблицу StockProduct
         # с помощью списка positions
-        stock = Stock.objects.create(**validated_data)
 
         # Create StockProduct instances and associate them with the stock
         for position_data in positions:
@@ -58,17 +57,9 @@ class StockSerializer(serializers.ModelSerializer):
         instance.save()
 
         # Update or create StockProduct instances and associate them with the stock
-        for position_data in positions:
-            position_id = position_data.get('id', None)
-            if position_id:
-                # If an ID is provided, update the existing StockProduct instance
-                position = StockProduct.objects.get(id=position_id, stock=instance)
-                position.product = position_data.get('product', position.product)
-                position.quantity = position_data.get('quantity', position.quantity)
-                position.price = position_data.get('price', position.price)
-                position.save()
-            else:
-                # If no ID is provided, create a new StockProduct instance
-                StockProduct.objects.create(stock=instance, **position_data)
+        for position in positions:
+            StockProduct.objects.update_or_create(stock=stock, product=position['product'],
+                                                  defaults={'price': position['price'],
+                                                            'quantity': position['quantity']})
 
         return stock
